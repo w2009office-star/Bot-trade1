@@ -3,82 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Monitor Market</title>
+    <title>Dashboard Jurnal & Pemantauan Market</title>
     <style>
+        /* Pengaturan Dasar dan Warna Tema Gelap (Mata Tidak Cepat Lelah) */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #131722; /* Warna gelap agar mata tidak cepat lelah */
-            color: white;
+            background-color: #131722; 
+            color: #d1d4dc;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
-        .header {
+        /* Bagian Atas: Profil & Saldo */
+        .header-container {
+            background-color: #1e222d;
+            padding: 15px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #2a2e39;
+            border-bottom: 2px solid #2a2e39;
         }
-        .title h2 {
+        .profil h2 {
             margin: 0;
-            color: #d1d4dc;
+            font-size: 18px;
+            color: #ffffff;
         }
-        .title p {
-            margin: 5px 0 0 0;
+        .profil p {
+            margin: 4px 0 0 0;
             font-size: 12px;
             color: #787b86;
         }
-        .balance-box {
-            background-color: #2a2e39;
-            padding: 10px 20px;
-            border-radius: 8px;
-            border-left: 4px solid #2962ff;
+        .saldo-box {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .saldo-text {
             text-align: right;
         }
-        .balance-title {
-            font-size: 12px;
-            color: #b2b5be;
-            margin: 0 0 5px 0;
-        }
-        .balance-amount {
-            font-size: 22px;
-            font-weight: bold;
+        .saldo-text p {
             margin: 0;
-            color: #ffffff;
+            font-size: 11px;
+            color: #b2b5be;
         }
+        .saldo-text h3 {
+            margin: 0;
+            font-size: 20px;
+            color: #2962ff;
+        }
+        .btn-edit {
+            background-color: #2962ff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .btn-edit:hover {
+            background-color: #1e4bd8;
+        }
+        /* Bagian Bawah: Grafik Layar Penuh */
         .chart-container {
-            height: 70vh; /* Mengambil 70% tinggi layar */
+            flex-grow: 1; /* Mengambil seluruh sisa layar di bawah header */
             width: 100%;
-            border-radius: 8px;
-            overflow: hidden;
         }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <div class="title">
-            <h2>Platform Analisis Personal</h2>
+    <!-- HEADER: Menampilkan Judul dan Saldo Anda -->
+    <div class="header-container">
+        <div class="profil">
+            <h2>Dashboard Pantauan</h2>
             <p>Fokus, Disiplin, Sabar.</p>
         </div>
-        
-        <!-- Saldo ini bersifat statis/manual karena tidak ada API ke broker -->
-        <div class="balance-box">
-            <p class="balance-title">Fokus pada Grafik, Bukan Saldo Eksternal</p>
-            <p class="balance-amount">Semangat!</p>
+        <div class="saldo-box">
+            <div class="saldo-text">
+                <p>Total Saldo Saat Ini</p>
+                <h3 id="angka-saldo">Rp 0</h3>
+            </div>
+            <!-- Tombol untuk mengubah angka saldo -->
+            <button class="btn-edit" onclick="updateSaldo()">Ubah Saldo</button>
         </div>
     </div>
 
-    <!-- Menarik data grafik Real-Time anti-lag dari TradingView -->
+    <!-- GRAFIK: Menampilkan Candle Real-Time Anti-Lag -->
     <div class="chart-container">
         <div class="tradingview-widget-container" style="height:100%;width:100%">
             <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
             <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
             {
                 "autosize": true,
-                "symbol": "FX:EURUSD", 
-                "interval": "1", 
+                "symbol": "FX:EURUSD",
+                "interval": "1",
                 "timezone": "Asia/Jakarta",
                 "theme": "dark",
                 "style": "1",
@@ -89,17 +111,38 @@
                 "hide_top_toolbar": false,
                 "hide_legend": false,
                 "save_image": false,
-                "container_id": "tradingview_78a1c"
+                "container_id": "tradingview_monitor"
             }
             </script>
         </div>
     </div>
 
+    <!-- JAVASCRIPT: Otak untuk menyimpan saldo agar tidak hilang -->
     <script>
-        // Di sini biasanya diletakkan kode JS untuk menarik saldo,
-        // tapi untuk alasan keamanan broker, hal tersebut diblokir oleh sistem mereka.
-        // Gunakan halaman ini murni untuk menganalisa pergerakan candle.
-        console.log("Sistem grafik berjalan dengan lancar tanpa lag.");
+        // Perintah ini berjalan otomatis saat layar pertama kali dibuka
+        document.addEventListener("DOMContentLoaded", function() {
+            // Mengecek apakah sebelumnya sudah ada saldo yang disimpan di memori HP
+            let saldoTersimpan = localStorage.getItem("dataSaldoPribadi");
+            
+            // Jika ada, tampilkan saldo tersebut
+            if (saldoTersimpan !== null) {
+                document.getElementById("angka-saldo").innerText = saldoTersimpan;
+            }
+        });
+
+        // Perintah ini berjalan saat tombol "Ubah Saldo" diklik
+        function updateSaldo() {
+            // Memunculkan kotak peringatan untuk mengetik saldo baru
+            let saldoBaru = prompt("Masukkan jumlah saldo terbaru Anda\n(contoh: Rp 1.500.000):");
+            
+            // Jika Anda mengetik sesuatu dan memencet OK
+            if (saldoBaru !== null && saldoBaru.trim() !== "") {
+                // 1. Ubah tulisan saldo di layar
+                document.getElementById("angka-saldo").innerText = saldoBaru;
+                // 2. Simpan secara permanen di memori aplikasi
+                localStorage.setItem("dataSaldoPribadi", saldoBaru);
+            }
+        }
     </script>
 
 </body>
