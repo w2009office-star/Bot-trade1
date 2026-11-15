@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cockroach Wedding Live</title>
+<style>
+  :root { --night:#1b1f12; --gold:#e8b84a; --paper:#fff8ee; }
+  html,body { margin:0; height:100%; background:#000; overflow:hidden; font-family:Georgia,serif; }
+  canvas { display:block; width:100%; height:100%; }
+  #start { position:fixed; inset:0; display:flex; flex-direction:column; gap:14px; align-items:center; justify-content:center;
+    background:rgba(20,16,10,.92); color:var(--paper); text-align:center; padding:24px; }
+  #start h1 { font-style:italic; font-weight:400; font-size:34px; margin:0; color:var(--gold); }
+  #start p { margin:0; max-width:320px; line-height:1.5; }
+  #start button { font:inherit; font-size:18px; padding:12px 28px; border:0; border-radius:999px; background:var(--gold); color:#2a1b05; }
+  #start button:focus-visible { outline:3px solid #fff; outline-offset:3px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start">
+  <h1 id="t">Cockroach Wedding</h1>
+  <p>Ketuk sekali supaya musik bisa diputar. Tambahkan <b>public/music.mp3</b> untuk lagu sendiri.</p>
+  <button id="go">Mulai pesta</button>
+</div>
+<script>
+const Q = new URLSearchParams(location.search);
+const TITLE = Q.get('title') || 'Cockroach Wedding';
+document.getElementById('t').textContent = TITLE;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const W = 540, H = 960, CX = 270, CY = 610, R = 185;
+let S = 1, OX = 0, OY = 0;
+function resize() {
+  const d = devicePixelRatio || 1;
+  cv.width = innerWidth * d; cv.height = innerHeight * d;
+  S = Math.min(cv.width / W, cv.height / H);
+  OX = (cv.width - W * S) / 2; OY = (cv.height - H * S) / 2;
+}
+addEventListener('resize', resize); resize();
+
+/* ---------- data ---------- */
+const DRESS = ['#4aa3c7','#e0577a','#f0b429','#6bbf59','#8e5bd1','#e8743b','#2f8f83','#d94f4f'];
+const HAT = [null,null,'#f4d03f','#e0577a','#4a90d9','#6bbf59'];
+const guests = new Map();     // nama -> kecoak
+const slots = Array(6).fill(null);
+const SLOT_XY = [[45,350],[90,350],[135,350],[45,400],[90,400],[135,400]];
+const MAX_GUESTS = 90, STAGE_SECS = 25;
+let T = 0, rot = 0, parts = [];
+
+function roach(name, dress, hat) {
+  return { name, dress, hat, x: 40 + Math.random() * 460, y: H + 40, tx: CX, ty: CY,
+           ph: Math.random() * 6.28, state: 'ring', crown: false, until: 0, moving: true, hop: 0 };
+}
+const bride = roach('', '#ffffff', '#ffffff'); bride.state = 'couple';
+const groom = roach('', '#1c1c24', null);      groom.state = 'couple';
