@@ -17,7 +17,10 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
-app.use(express.static('public'));
+const path = require('path');
+const file = (n) => (req, res) => res.sendFile(path.join(__dirname, n), (e) => e && res.status(404).end());
+app.get('/', file('game.html'));
+app.get('/music.mp3', file('music.mp3'));
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const broadcast = (d) => {
@@ -50,6 +53,3 @@ function connect() {
     .then(() => { if (live === c) { state = 'on'; broadcast({ type: 'status', on: true }); console.log(`ON: terhubung ke @${user}`); } })
     .catch((e) => { console.error('Gagal terhubung (apakah sedang LIVE?):', e.message || e); again(15000); });
   c.on('member', (d) => broadcast({ type: 'join', name: nm(d) }));
-  c.on('chat', (d) => broadcast({ type: 'join', name: nm(d) })); // jaga-jaga kalau event masuk terlewat
-  c.on('gift', (d) => {
-    if (d.giftType === 1 && !d.repeatEnd) return; // gift beruntun: proses sekali saat selesai
