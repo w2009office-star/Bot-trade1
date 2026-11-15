@@ -1,0 +1,17 @@
+{
+  "name": "cockroach-wedding-live",
+  "version": "1.1.0",
+  "description": "Live TikTok interaktif: penonton masuk jadi kecoak berdansa, gift naik panggung. Server + APK on/off.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "express": "^4.19.2",
+    "tiktok-live-connector": "^1.2.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/core": "^6.1.0"
+  }
+}
