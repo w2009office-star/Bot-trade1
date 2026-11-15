@@ -1,6 +1,0 @@
-{
-  "appId": "com.cockroach.live",
-  "appName": "Cockroach Live",
-  "webDir": "www",
-  "server": { "androidScheme": "http", "cleartext": true }
-}
