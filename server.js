@@ -1,3 +1,4 @@
+cat > server.js <<'EOF'
 // Server: dengar event TikTok LIVE -> kirim ke game lewat WebSocket.
 // Bisa di-ON/OFF lewat API (dipakai oleh APK) atau langsung: node server.js namatiktok
 const express = require('express');
@@ -53,3 +54,28 @@ function connect() {
     .then(() => { if (live === c) { state = 'on'; broadcast({ type: 'status', on: true }); console.log(`ON: terhubung ke @${user}`); } })
     .catch((e) => { console.error('Gagal terhubung (apakah sedang LIVE?):', e.message || e); again(15000); });
   c.on('member', (d) => broadcast({ type: 'join', name: nm(d) }));
+  c.on('chat', (d) => broadcast({ type: 'join', name: nm(d) })); // jaga-jaga kalau event masuk terlewat
+  c.on('gift', (d) => {
+    if (d.giftType === 1 && !d.repeatEnd) return; // gift beruntun: proses sekali saat selesai
+    broadcast({ type: 'gift', name: nm(d), gift: d.giftName });
+  });
+  c.on('disconnected', () => again(10000));
+  c.on('streamEnd', () => again(10000));
+  c.on('error', (e) => console.error('Error:', e && e.message ? e.message : e));
+}
+
+/* ---------- API untuk APK ---------- */
+const auth = (req, res, next) => (KEY && req.get('x-key') !== KEY ? res.status(401).json({ error: 'key' }) : next());
+app.post('/api/start', auth, (req, res) => {
+  const u = String((req.body && req.body.user) || '').trim();
+  if (!u) return res.status(400).json({ error: 'user' });
+  start(u); res.json({ ok: true });
+});
+app.post('/api/stop', auth, (req, res) => { stop(); res.json({ ok: true }); });
+app.get('/api/status', (req, res) => res.json({ state, user }));
+
+server.listen(PORT, () => {
+  console.log(`Game: http://localhost:${PORT}  (mode uji: /?demo)`);
+  if (AUTO) start(AUTO);
+});
+EOF
