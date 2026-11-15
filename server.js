@@ -1,4 +1,3 @@
-cat > server.js <<'EOF'
 // Server: dengar event TikTok LIVE -> kirim ke game lewat WebSocket.
 // Bisa di-ON/OFF lewat API (dipakai oleh APK) atau langsung: node server.js namatiktok
 const express = require('express');
@@ -78,4 +77,3 @@ server.listen(PORT, () => {
   console.log(`Game: http://localhost:${PORT}  (mode uji: /?demo)`);
   if (AUTO) start(AUTO);
 });
-EOF
