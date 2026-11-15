@@ -53,3 +53,227 @@ function roach(name, dress, hat) {
 }
 const bride = roach('', '#ffffff', '#ffffff'); bride.state = 'couple';
 const groom = roach('', '#1c1c24', null);      groom.state = 'couple';
+const photogs = [[203,300],[200,372],[337,300],[340,372]].map(([x, y]) => {
+  const p = roach('', '#2b2b33', null);
+  Object.assign(p, { state: 'photog', x, y, tx: x, ty: y, cam: true, moving: false, sc: .55 }); return p; });
+const queue = []; let nextSpawn = 0, flashes = [];
+
+function spawn(name) {
+  if (guests.size >= MAX_GUESTS) {
+    const old = [...guests.values()].find(r => r.state === 'ring');
+    if (old) guests.delete(old.name);
+  }
+  const r = roach(name, DRESS[Math.random() * DRESS.length | 0], HAT[Math.random() * HAT.length | 0]);
+  r.state = 'enter'; r.sc = .8; guests.set(name, r);
+}
+function addGuest(name) {
+  const g = guests.get(name);
+  if (g) { g.hop = 1; return; }
+  if (!queue.includes(name) && queue.length < 40) queue.push(name);
+}
+function giftGuest(name) {
+  const qi = queue.indexOf(name); if (qi >= 0) queue.splice(qi, 1);
+  if (!guests.has(name)) spawn(name);
+  const g = guests.get(name);
+  if (g.state === 'stage') { g.until = T + STAGE_SECS; confetti(g.x, g.y); return; }
+  let i = slots.indexOf(null);
+  if (i < 0) {                                   // panggung penuh: geser yang paling lama
+    let oldest = 0;
+    slots.forEach((r, k) => { if (r.until < slots[oldest].until) oldest = k; });
+    leaveStage(slots[oldest]); i = oldest;
+  }
+  slots[i] = g; g.slot = i; g.state = 'stage'; g.crown = true; g.until = T + STAGE_SECS;
+  confetti(SLOT_XY[i][0], SLOT_XY[i][1]);
+}
+function leaveStage(g) { slots[g.slot] = null; g.state = 'ring'; g.crown = false; }
+function confetti(x, y) {
+  for (let i = 0; i < 22; i++) parts.push({ x, y: y - 30, vx: (Math.random() - .5) * 220, vy: -Math.random() * 220 - 40,
+    life: 1.4, col: DRESS[i % DRESS.length], t: '' });
+}
+
+/* ---------- update ---------- */
+function update(dt) {
+  T += dt; rot += 0.12 * dt;
+  if (queue.length && T >= nextSpawn) { spawn(queue.shift()); nextSpawn = T + (queue.length > 8 ? .6 : 1.4); }
+  flashes = flashes.filter(f => (f.life -= dt) > 0);
+  const ring = [...guests.values()].filter(r => r.state === 'ring');
+  ring.forEach((r, i) => {
+    const a = rot + (i / ring.length) * 6.283, rad = ring.length > 16 && i % 2 ? R - 45 : R;
+    r.tx = CX + Math.cos(a) * rad; r.ty = CY + Math.sin(a) * rad;
+  });
+  for (const r of guests.values()) {
+    if (r.state === 'enter') {
+      r.tx = CX + Math.sin(T * 1.4 + r.ph) * 7; r.ty = 466;
+      if (r.ty - r.y < 5) { r.state = 'pose'; r.until = T + 1.1; }
+    } else if (r.state === 'pose') { r.tx = r.x; r.ty = r.y; if (T > r.until) r.state = 'ring'; }
+    if ((r.state === 'enter' || r.state === 'pose') && Math.random() < dt * (r.state === 'pose' ? 12 : 3.5)) {
+      const p = photogs[Math.random() * photogs.length | 0]; flashes.push({ x: p.x, y: p.y - 34, life: .22 });
+    }
+    if (r.state === 'stage') {
+      [r.tx, r.ty] = SLOT_XY[r.slot];
+      if (T > r.until) leaveStage(r);
+    }
+    step(r, dt);
+  }
+  bride.x = CX + Math.cos(T * 1.2) * 18; bride.y = CY + Math.sin(T * 1.2) * 10;
+  groom.x = CX - Math.cos(T * 1.2) * 18; groom.y = CY - Math.sin(T * 1.2) * 10;
+  if (Math.random() < dt * 2.5) {                // hati dari panggung
+    const s = slots.filter(Boolean);
+    if (s.length) { const r = s[Math.random() * s.length | 0]; parts.push({ x: r.x, y: r.y - 60, vx: (Math.random() - .5) * 30, vy: -50, life: 1.6, t: '💖' }); }
+  }
+  parts = parts.filter(p => (p.life -= dt) > 0);
+  parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; if (!p.t) p.vy += 400 * dt; });
+}
+function step(r, dt) {
+  const dx = r.tx - r.x, dy = r.ty - r.y, d = Math.hypot(dx, dy);
+  r.moving = d > 8;
+  const sp = r.state === 'enter' ? 62 : 150;
+  if (d > 1) { const m = Math.min(d, sp * dt * (d > 50 ? 1 : Math.max(.35, d / 50))); r.x += dx / d * m; r.y += dy / d * m; }
+  r.hop = Math.max(0, r.hop - dt * 2);
+  const ts = r.state === 'enter' || r.state === 'pose' ? .8 : r.state === 'stage' ? .85 : .6;
+  r.sc += (ts - r.sc) * Math.min(1, dt * 4);
+}
+
+/* ---------- gambar ---------- */
+const ln = (a, b, c, d) => { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke(); };
+const disc = (x, y, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill(); };
+
+function drawRoach(r) {
+  const st = r.state === 'stage', cw = r.state === 'enter', sc = r.sc, f = cw ? 5 : r.moving ? 11 : 6;
+  const bob = Math.abs(Math.sin(T * f + r.ph)) * (st ? 9 : cw ? 3 : 5) + Math.sin(r.hop * 3.14) * 14;
+  ctx.save(); ctx.translate(r.x, r.y - bob * sc); ctx.scale(sc, sc); ctx.rotate(Math.sin(T * 3 + r.ph) * (st ? .16 : cw ? .13 : .09));
+  ctx.lineCap = 'round'; ctx.strokeStyle = '#6b3a1b'; ctx.lineWidth = 5;
+  const k = Math.sin(T * 9 + r.ph) * 7;
+  ln(-10, 28, -14, 52 + k); ln(10, 28, 14, 52 - k);
+  ctx.fillStyle = r.dress; ctx.beginPath(); ctx.moveTo(-14, -2); ctx.lineTo(14, -2); ctx.lineTo(32, 36); ctx.lineTo(-32, 36); ctx.fill();
+  if (r.dress === '#1c1c24') { disc(0, 0, 4, '#d33'); }
+  ctx.fillStyle = '#c26a2c'; ctx.beginPath(); ctx.ellipse(0, -8, 17, 13, 0, 0, 6.283); ctx.fill();
+  const up = Math.sin(T * 7 + r.ph) * 12 + (st || r.state === 'pose' ? 14 : 0);
+  ln(-15, -6, -34, -12 - up); ln(15, -6, 34, -12 + up * .6);
+  disc(0, -34, 19, '#a8541f');
+  disc(-8, -36, 7, '#fff'); disc(8, -36, 7, '#fff'); disc(-7, -35, 3.5, '#111'); disc(9, -35, 3.5, '#111');
+  ctx.strokeStyle = '#2a1308'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -29, 6, .15, 2.99); ctx.stroke();
+  ctx.strokeStyle = '#6b3a1b'; ctx.lineWidth = 3; const w = Math.sin(T * 5 + r.ph) * 6;
+  ctx.beginPath(); ctx.moveTo(-5, -50); ctx.quadraticCurveTo(-10 + w, -72, -24 + w, -84); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(5, -50); ctx.quadraticCurveTo(10 + w, -72, 24 + w, -84); ctx.stroke();
+  if (r.crown) { ctx.fillStyle = '#f1c232'; ctx.beginPath(); ctx.moveTo(-14, -48); ctx.lineTo(-14, -66); ctx.lineTo(-7, -56); ctx.lineTo(0, -70); ctx.lineTo(7, -56); ctx.lineTo(14, -66); ctx.lineTo(14, -48); ctx.fill(); }
+  else if (r.hat) { ctx.fillStyle = r.hat; ctx.beginPath(); ctx.arc(0, -44, 17, 3.14, 6.283); ctx.fill(); ctx.fillRect(-21, -45, 42, 4); }
+  if (r.cam) { ctx.fillStyle = '#1a1a1f'; ctx.fillRect(-14, -44, 28, 16); disc(0, -36, 6, '#8ec5ff'); disc(10, -46, 2.5, '#fff'); }
+  ctx.restore();
+  if (r.name) {
+    ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+    const lw = Math.min(ctx.measureText(r.name).width, 90) + 10, y = r.y + 36 * sc + 8;
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(r.x - lw / 2, y - 10, lw, 15, 7); ctx.fill();
+    ctx.fillStyle = st ? '#ffd966' : '#fff'; ctx.fillText(r.name, r.x, y + 1, 90);
+  }
+}
+
+function scene() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2b3318'); bg.addColorStop(1, '#4a4a2a');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  [[60,60,70],[170,30,55],[420,50,75],[510,110,60]].forEach(t => disc(t[0], t[1], t[2], '#4d6b2e'));
+  // lantai batu
+  const fl = ctx.createRadialGradient(CX, CY, 20, CX, CY, R + 70); fl.addColorStop(0, '#cfc9bb'); fl.addColorStop(1, '#9d9788');
+  ctx.fillStyle = fl; ctx.beginPath(); ctx.arc(CX, CY, R + 70, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(CX, CY, R - 70, 0, 6.283); ctx.stroke();
+  // karpet merah
+  const cg = ctx.createLinearGradient(0, 250, 0, 480); cg.addColorStop(0, '#d9323e'); cg.addColorStop(1, '#8a1620');
+  ctx.fillStyle = cg; ctx.beginPath(); ctx.moveTo(240, 250); ctx.lineTo(300, 250); ctx.lineTo(314, 480); ctx.lineTo(226, 480); ctx.fill();
+  ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 3; ln(240, 250, 226, 480); ln(300, 250, 314, 480);
+  for (let y = 280; y <= 460; y += 60) { const o = (y - 250) * 14 / 230; disc(231 - o, y, 4, '#f1c232'); disc(309 + o, y, 4, '#f1c232'); }
+  // panggung
+  ctx.fillStyle = '#6e4326'; ctx.fillRect(10, 300, 160, 140); ctx.fillStyle = '#8a5a35'; ctx.fillRect(10, 300, 160, 12);
+  for (let i = 0; i < 6; i++) disc(25 + i * 26, 306, 4, i % 2 ? '#ffd966' : '#ff8fb1');
+  // gerbang + spanduk
+  ctx.fillStyle = '#a81f2b'; ctx.fillRect(92, 130, 22, 150); ctx.fillRect(426, 130, 22, 150);
+  disc(103, 126, 16, '#c9962b'); disc(437, 126, 16, '#c9962b');
+  ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.roundRect(106, 110, 328, 128, 6); ctx.fill();
+  ['#e0577a','#f0b429','#4aa3c7','#6bbf59'].forEach((c, i) => { for (let x = 112 + i * 20; x < 430; x += 80) { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, 112); ctx.lineTo(x + 16, 112); ctx.lineTo(x + 8, 128); ctx.fill(); } });
+  ctx.fillStyle = '#a81f2b'; ctx.font = 'italic bold 36px Georgia,serif'; ctx.textAlign = 'center'; ctx.fillText(TITLE, CX, 190, 300);
+  ctx.font = '26px sans-serif'; ctx.fillText('🤵  ♥  👰', CX, 228);
+}
+
+function lights() {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  [[150, 0], [390, Math.PI]].forEach(([ox, o]) => {            // lampu sorot bergerak
+    const ex = CX + Math.sin(T * .7 + o) * 70, g = ctx.createLinearGradient(ox, 0, ex, 420);
+    g.addColorStop(0, 'rgba(255,236,190,.22)'); g.addColorStop(1, 'rgba(255,236,190,.02)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(ox - 8, 0); ctx.lineTo(ox + 8, 0); ctx.lineTo(ex + 55, 420); ctx.lineTo(ex - 55, 420); ctx.fill();
+  });
+  for (const r of guests.values()) if (r.state === 'enter' || r.state === 'pose') {   // sorot si peragawati
+    const g = ctx.createLinearGradient(r.x, 0, r.x, r.y);
+    g.addColorStop(0, 'rgba(255,245,215,0)'); g.addColorStop(1, 'rgba(255,245,215,.3)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r.x - 6, 0); ctx.lineTo(r.x + 6, 0); ctx.lineTo(r.x + 42, r.y + 30); ctx.lineTo(r.x - 42, r.y + 30); ctx.fill();
+    const f = ctx.createRadialGradient(r.x, r.y + 28, 4, r.x, r.y + 28, 62); f.addColorStop(0, 'rgba(255,240,200,.55)'); f.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = f; ctx.beginPath(); ctx.ellipse(r.x, r.y + 28, 62, 26, 0, 0, 6.283); ctx.fill();
+  }
+  flashes.forEach(fl => {                                           // kilatan kamera
+    const k = fl.life / .22, rad = 70 * k + 10, g = ctx.createRadialGradient(fl.x, fl.y, 0, fl.x, fl.y, rad);
+    g.addColorStop(0, 'rgba(255,255,255,' + k + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fl.x, fl.y, rad, 0, 6.283); ctx.fill();
+  });
+  ctx.restore();
+  const v = ctx.createRadialGradient(CX, 440, 190, CX, 440, 640);   // vignette sinematik
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.5)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+}
+
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(S, 0, 0, S, OX, OY); ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  scene();
+  [...guests.values(), bride, groom, ...photogs].sort((a, b) => a.y - b.y).forEach(drawRoach);
+  lights();
+  parts.forEach(p => {
+    ctx.globalAlpha = Math.min(1, p.life);
+    if (p.t) { ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(p.t, p.x, p.y); }
+    else { ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, 6, 9); }
+  });
+  ctx.globalAlpha = 1;
+  ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,.55)';
+  ctx.beginPath(); ctx.roundRect(70, 912, 400, 30, 15); ctx.fill();
+  ctx.fillStyle = '#ffd966'; ctx.fillText('🌹 kirim Mawar = naik panggung!  •  ' + (guests.size + queue.length) + ' penari', CX, 932);
+  ctx.restore();
+}
+let last = performance.now();
+(function frame(now) { const dt = Math.min(.05, (now - last) / 1000); last = now; update(dt); draw(); requestAnimationFrame(frame); })(last);
+
+/* ---------- musik: music.mp3 kalau ada, kalau tidak pakai nada bawaan ---------- */
+const mp3 = new Audio('music.mp3'); mp3.loop = true;
+function synth() {
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const beat = 60 / 138, hz = s => 261.63 * Math.pow(2, s / 12);
+  const chords = [[0,4,7],[5,9,12],[7,11,14],[0,4,7],[9,12,16],[5,9,12],[7,11,14],[0,4,7]];
+  const mel = [[12,16,19],[17,16,12],[14,19,23],[19,16,12],[16,12,9],[17,21,17],[14,16,19],[24,19,12]];
+  const tone = (f, t, d, type, g) => { const o = ac.createOscillator(), v = ac.createGain(); o.type = type; o.frequency.value = f;
+    v.gain.setValueAtTime(g, t); v.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(v); v.connect(ac.destination); o.start(t); o.stop(t + d); };
+  let n = 0, next = ac.currentTime + .1;
+  setInterval(() => { while (next < ac.currentTime + .4) {
+    const bar = Math.floor(n / 3) % 8, b = n % 3, c = chords[bar];
+    if (b === 0) tone(hz(c[0] - 12), next, beat * .95, 'triangle', .3);
+    else c.forEach(s => tone(hz(s), next, beat * .6, 'sine', .08));
+    tone(hz(mel[bar][b]), next, beat * .8, 'triangle', .12);
+    next += beat; n++; } }, 100);
+}
+document.getElementById('go').onclick = async () => {
+  document.getElementById('start').remove();
+  try { await mp3.play(); } catch (e) { synth(); }
+};
+
+/* ---------- koneksi ke server / mode uji ---------- */
+function connectWS() {
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws.onmessage = e => { const d = JSON.parse(e.data);
+    if (d.type === 'gift') giftGuest(d.name); else if (d.type === 'join') addGuest(d.name);
+    else if (d.type === 'reset') { guests.clear(); slots.fill(null); queue.length = 0; } };
+  ws.onclose = () => setTimeout(connectWS, 2000);
+}
+connectWS();
+if (Q.has('demo')) {
+  let i = 0;
+  setInterval(() => addGuest('penonton' + (++i)), 1200);
+  setInterval(() => giftGuest('penonton' + Math.max(1, i - (Math.random() * 8 | 0))), 5000);
+}
+</script>
+</body>
+</html>
